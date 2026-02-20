@@ -124,11 +124,13 @@ Test CLI commands directly in terminal:
 
 ```bash
 # Test Gemini
-gemini "Hello" --sandbox -o text
+gemini -p "Hello" --sandbox -o text
 
 # Test Codex
 codex exec --sandbox read-only --skip-git-repo-check -- "Hello"
 ```
+
+**"Must specify GEMINI_API_KEY"**: The Gemini CLI's non-interactive mode (`-p`) does not read credentials from its encrypted storage — it only checks `process.env.GEMINI_API_KEY` (loaded via dotenv). Even if `gemini --login` or `/auth login` works interactively, you need `~/.gemini/.env` with `GEMINI_API_KEY=your-key` for subprocess/magi use.
 
 ## Contributing
 

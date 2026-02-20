@@ -29,13 +29,13 @@ Task:
 
     **Instructions**:
     1. Run these two Bash commands in parallel:
-       - gemini "[prompt]" --model gemini-3-pro-preview --sandbox -o text
+       - gemini -p "[prompt]" --model gemini-3.1-pro-preview --sandbox -o text
        - codex exec --sandbox read-only --skip-git-repo-check -- "[prompt]"
     2. Also formulate your own response as the Claude advisor
     3. Wait for ALL results before proceeding
     4. If Gemini fails with 429/capacity error:
-       - Wait 60 seconds, retry with gemini-3-pro-preview
-       - If still fails, try gemini-3-flash-preview
+       - Wait 60 seconds, retry with gemini-3.1-pro-preview
+       - If still fails, try gemini-3.1-flash-preview
        - If that fails, note "Gemini unavailable" and proceed
     5. If EITHER command fails with permission denied ("denied by policy"):
        - STOP immediately
@@ -110,7 +110,7 @@ Gemini and Codex (external CLIs) may fail.
 |------------|--------|
 | Permission denied | **STOP** - show setup instructions below |
 | 429 / capacity | Wait 60s → retry pro → try flash → proceed without if still fails |
-| Auth error | Suggest `gemini --login` or `codex login` |
+| Auth error / missing API key | Suggest `~/.gemini/.env` setup (see below) or `codex login` |
 | CLI not found | Link to [reference.md](reference.md) for install |
 | Network error | Retry once |
 
@@ -123,6 +123,20 @@ Add these entries to your .claude/settings.local.json permissions.allow array:
 Then restart Claude Code.
 ```
 Do NOT fall back to Claude-only for permission errors - user must fix setup.
+
+**Gemini API key setup** (show for "must specify GEMINI_API_KEY" errors):
+```
+The Gemini CLI stores your API key in encrypted storage, but non-interactive
+mode (used by magi) only reads from environment variables / .env files.
+
+Fix: Create ~/.gemini/.env with your API key:
+  echo 'GEMINI_API_KEY=your-key-here' > ~/.gemini/.env
+  chmod 600 ~/.gemini/.env
+
+Get your key from https://aistudio.google.com/app/apikey
+or extract the one already stored by Gemini CLI:
+  node --input-type=module -e "import{loadApiKey}from'$(brew --prefix)/Cellar/gemini-cli/$(gemini --version)/libexec/lib/node_modules/@google/gemini-cli/node_modules/@google/gemini-cli-core/dist/src/core/apiKeyCredentialStorage.js';const k=await loadApiKey();process.stdout.write(k??'')"
+```
 
 ## Usage Examples
 

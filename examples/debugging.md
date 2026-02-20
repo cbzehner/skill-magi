@@ -10,7 +10,7 @@
 # Run in parallel (all in one message with run_in_background: true)
 
 # Gemini
-gemini "Error: Function returns undefined
+gemini -p "Error: Function returns undefined
 Code: const data = response.json(); return data;
 Provide: 1) Cause 2) Investigation 3) Fix 4) Prevention" --sandbox -o text
 

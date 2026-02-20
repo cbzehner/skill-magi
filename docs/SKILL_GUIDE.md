@@ -38,7 +38,7 @@ Move **informational content** to separate files:
 
 ```markdown
 # Good: SKILL.md has the command
-Bash: gemini "[prompt]" --sandbox -o text
+Bash: gemini -p "[prompt]" --sandbox -o text
 
 # Bad: SKILL.md references another file for the command
 See [reference.md](reference.md) for invocation syntax.
@@ -71,7 +71,7 @@ If the script just:
 
 Then consider markdown-only.
 
-**Example**: A script that calls `gemini "$PROMPT" --sandbox` with input validation adds complexity without meaningful value. Claude can run the command directly and interpret any errors.
+**Example**: A script that calls `gemini -p "$PROMPT" --sandbox` with input validation adds complexity without meaningful value. Claude can run the command directly and interpret any errors.
 
 ---
 

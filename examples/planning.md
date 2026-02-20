@@ -10,7 +10,7 @@
 # Run in parallel (all in one message with run_in_background: true)
 
 # Gemini
-gemini "Task: Add JWT auth to Express API
+gemini -p "Task: Add JWT auth to Express API
 Context: Express backend, PostgreSQL, no existing auth
 Provide: 1) Approach 2) Steps 3) Risks 4) Alternatives" --sandbox -o text
 

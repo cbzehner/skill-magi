@@ -28,6 +28,17 @@ npm install -g @openai/codex
 codex login
 ```
 
+> **Note:** Magi runs Gemini in non-interactive mode, which requires the API key
+> as an environment variable. If you authenticated via `gemini --login` or `/auth login`,
+> you also need to create `~/.gemini/.env`:
+>
+> ```bash
+> echo 'GEMINI_API_KEY=your-key-here' > ~/.gemini/.env
+> chmod 600 ~/.gemini/.env
+> ```
+>
+> Get your key from [AI Studio](https://aistudio.google.com/app/apikey).
+
 ## Installation
 
 ### From Marketplace
@@ -128,7 +139,7 @@ magi/
 
 **Data sent**: Your prompts are sent to Google (Gemini), OpenAI (Codex), and Anthropic (Claude) APIs.
 
-**Cost**: Each query invokes 3 AI models. Monitor your API usage accordingly. To query just one model, call the CLI directly: `gemini "prompt" --sandbox -o text` or `codex exec --sandbox read-only -- "prompt"`.
+**Cost**: Each query invokes 3 AI models. Monitor your API usage accordingly. To query just one model, call the CLI directly: `gemini -p "prompt" --sandbox -o text` or `codex exec --sandbox read-only -- "prompt"`.
 
 ## License
 

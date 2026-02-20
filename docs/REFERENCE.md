@@ -27,11 +27,12 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for full details.
 **Strengths**: Web search (`google_web_search`), 1M token context, `codebase_investigator`
 
 ```bash
-gemini "[prompt]" --sandbox -o text
+gemini -p "[prompt]" --sandbox -o text
 ```
 
 | Flag | Purpose |
 |------|---------|
+| `-p` / `--prompt` | Non-interactive mode (required for headless/subprocess use) |
 | `--sandbox` | Read-only mode, no file writes |
 | `-o` | Output: text, json, stream-json |
 | `-m` | Model: flash, pro, flash-lite |

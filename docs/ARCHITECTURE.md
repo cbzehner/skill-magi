@@ -51,7 +51,7 @@ Running `claude -p` as a subprocess causes session contention and hangs. Task su
 | Advisor | Method | Model |
 |---------|--------|-------|
 | Gemini | Bash → CLI | Gemini's default |
-| Codex | Bash → CLI | gpt-5.2-codex |
+| Codex | Bash → CLI | gpt-5.3-codex |
 | Claude | Task subagent | opus |
 
 ## Files
