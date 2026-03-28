@@ -45,7 +45,7 @@ codex login
 
 ```bash
 # Add the marketplace
-/plugin marketplace add cbzehner/claude-skill-magi
+/plugin marketplace add cbzehner/skill-magi
 
 # Install the skill
 /plugin install magi@cbzehner
@@ -57,7 +57,7 @@ Clone into your `.claude/skills/` directory:
 
 ```bash
 cd ~/.claude/skills/
-git clone https://github.com/cbzehner/claude-skill-magi.git magi
+git clone https://github.com/cbzehner/skill-magi.git magi
 ```
 
 ## Usage
