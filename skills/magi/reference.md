@@ -9,7 +9,7 @@ Advisor capabilities and CLI details. Loaded on demand.
 | Advisor | Model | Strengths | Best For |
 |---------|-------|-----------|----------|
 | Gemini | gemini-3.1-pro-preview | Web search, 1M token context, advanced reasoning | Current info, API docs, library research |
-| Codex | gpt-5.3-codex (high reasoning) | Fast (Rust-based), fine-grained sandboxing | Quick analysis, CI/CD patterns, security |
+| Codex | gpt-5.4 (high reasoning) | Fast (Rust-based), fine-grained sandboxing | Quick analysis, CI/CD patterns, security |
 | Claude | Opus 4.6 | Deep reasoning, code expertise | Architecture, code review, complex problems |
 
 ---
@@ -25,11 +25,11 @@ gemini -p "[prompt]" --model gemini-3.1-pro-preview --sandbox -o text
 | Flag | Purpose |
 |------|---------|
 | `-p` / `--prompt` | Non-interactive mode (required for headless/subprocess use) |
-| `--model` | `gemini-3.1-pro-preview` (max reasoning), `gemini-3.1-flash-preview` (fallback) |
+| `--model` | `gemini-3.1-pro-preview` (max reasoning) |
 | `--sandbox` | Read-only mode, no file writes |
 | `-o` | Output format: `text`, `json`, `stream-json` |
 
-**Capacity errors**: Pro preview has limited capacity. On 429 error: wait 60s → retry pro → try flash → skip if still fails.
+**Capacity errors**: Pro preview has limited capacity. On 429 error: wait 60s → retry pro → skip if still fails.
 
 **Install**: `npm install -g @google/gemini-cli && gemini --login`
 
@@ -46,7 +46,7 @@ codex exec --sandbox read-only --skip-git-repo-check -- "[prompt]"
 | `exec` | Non-interactive mode |
 | `--sandbox` | `read-only`, `workspace-write`, `danger-full-access` |
 | `--skip-git-repo-check` | Run outside git repositories |
-| `--model` | Model override (default: gpt-5.3-codex) |
+| `--model` | Model override (default: gpt-5.4) |
 
 **Config**: `model_reasoning_effort = "high"` set in `~/.codex/config.toml`
 

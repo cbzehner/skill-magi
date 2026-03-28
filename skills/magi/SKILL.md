@@ -1,6 +1,7 @@
 ---
 name: magi
-description: Multi-AI counsel system. Query Gemini, Codex, Claude advisors together with synthesis. Use when planning features, debugging errors, researching APIs, finalizing plans, reviewing code, or wanting alternative perspectives.
+description: Multi-AI counsel system. Query Gemini, Codex, Claude advisors in parallel with synthesis. Use for second opinions, planning features, debugging, researching APIs, reviewing code, architecture decisions, or alternative perspectives. Use this whenever the user wants advice, says "what do you think", or would benefit from multiple viewpoints.
+argument-hint: "[prompt]"
 allowed-tools: Bash, Read, Glob, Grep, Task
 # Note: Write/Edit intentionally excluded - magi is advisory only
 ---
@@ -12,6 +13,12 @@ Query AI advisors for multi-perspective counsel.
 ## Usage
 
 If `$ARGUMENTS` is empty, show usage examples. Otherwise, query all three advisors with the prompt.
+
+## When NOT to Use
+
+- **Trivial questions** — if you already know the answer, magi adds latency for no value
+- **Time-sensitive work** — advisor queries take 30-60s; skip when speed matters more than breadth
+- **Subjective preferences** — style choices, naming conventions; advisors won't converge
 
 ## Querying Advisors
 
@@ -35,8 +42,7 @@ Task:
     3. Wait for ALL results before proceeding
     4. If Gemini fails with 429/capacity error:
        - Wait 60 seconds, retry with gemini-3.1-pro-preview
-       - If still fails, try gemini-3.1-flash-preview
-       - If that fails, note "Gemini unavailable" and proceed
+       - If still fails, note "Gemini unavailable" and proceed
     5. If EITHER command fails with permission denied ("denied by policy"):
        - STOP immediately
        - Do NOT proceed with Claude-only synthesis
@@ -109,20 +115,12 @@ Gemini and Codex (external CLIs) may fail.
 | Error Type | Action |
 |------------|--------|
 | Permission denied | **STOP** - show setup instructions below |
-| 429 / capacity | Wait 60s → retry pro → try flash → proceed without if still fails |
+| 429 / capacity | Wait 60s → retry pro → proceed without if still fails |
 | Auth error / missing API key | Suggest `~/.gemini/.env` setup (see below) or `codex login` |
 | CLI not found | Link to [reference.md](reference.md) for install |
 | Network error | Retry once |
 
-**Permission setup** (show only for permission errors):
-```
-Add these entries to your .claude/settings.local.json permissions.allow array:
-  "Bash(gemini *)"
-  "Bash(codex *)"
-
-Then restart Claude Code.
-```
-Do NOT fall back to Claude-only for permission errors - user must fix setup.
+Do not fall back to Claude-only for permission errors — the value of magi is multi-perspective counsel, and a Claude-only response is just a normal conversation. The user should fix permissions so they get what they asked for. Show the setup message from the subagent template above.
 
 **Gemini API key setup** (show for "must specify GEMINI_API_KEY" errors):
 ```
