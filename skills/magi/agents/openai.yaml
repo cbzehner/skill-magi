@@ -1,0 +1,4 @@
+interface:
+  display_name: "Magi"
+  short_description: "Query multiple advisors and synthesize their guidance"
+  default_prompt: "Use $magi to get multi-advisor input on this question and synthesize the best recommendation."

@@ -1,23 +1,44 @@
 # Synthesis Guide
 
-Patterns for combining advisor responses. Loaded on demand.
+Patterns for combining advisor responses and the standard report template.
 
 ---
+
+## Why Synthesis Exists
+
+Without synthesis, magi is just fan-out plus transcript dumping. The synthesis
+step compresses multiple advisor outputs into one decision artifact, makes
+agreement and disagreement explicit, and creates a stable object for review.
 
 ## Synthesis Patterns
 
 | Pattern | When | Action |
 |---------|------|--------|
-| **Consensus** | All agree | Proceed with confidence; watch for shared blind spots |
-| **Complementary** | Different but compatible | Combine: Gemini's research + Codex's patterns + Claude's architecture |
+| **Consensus** | Advisors mostly agree | Proceed with confidence; watch for shared blind spots |
+| **Complementary** | Different but compatible | Combine deliberately: e.g. Gemini's research + Codex's patterns + Claude's architecture |
 | **Conflict** | Direct contradiction | Evaluate evidence quality, apply project context, prefer simpler/reversible |
-| **Gap** | One advisor silent | Note gap, query specifically if critical, or mark as assumption |
+| **Gap** | One advisor silent | Note gap; do not invent agreement |
 
-**On conflicts**: Good evidence = specific references, reasoned arguments. Weak evidence = vague claims, false confidence. When in doubt, prefer existing project patterns.
+**On conflicts**: Good evidence = specific references, reasoned arguments,
+testable claims. Weak evidence = vague confidence without support. When in
+doubt, prefer existing project patterns.
+
+## Review Separation
+
+The reviewer should inspect the synthesized artifact for:
+- false consensus
+- dropped caveats
+- overweighting one advisor without evidence
+- recommendations that are hard to reverse
+
+Review is a separate step from synthesis. Keep them apart.
 
 ---
 
 ## Report Template
+
+Replace `[Host Advisor]` below with the actual host name — Claude or Codex —
+so the user sees which model said what.
 
 ```markdown
 ## Quick Answer
@@ -38,9 +59,9 @@ Patterns for combining advisor responses. Loaded on demand.
 </details>
 
 <details>
-<summary>Claude Response</summary>
+<summary>[Host Advisor] Response</summary>
 
-[Full response]
+[Full response or "Unavailable: [reason]"]
 
 </details>
 
@@ -49,7 +70,7 @@ Patterns for combining advisor responses. Loaded on demand.
 |---------|-------------|
 | Gemini | ... |
 | Codex | ... |
-| Claude | ... |
+| [Host Advisor] | ... |
 
 **Consensus**: [What they agreed on]
 **Conflicts**: [Disagreements and resolution]

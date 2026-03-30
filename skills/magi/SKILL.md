@@ -1,28 +1,80 @@
 ---
 name: magi
-description: Multi-AI counsel system. Query Gemini, Codex, Claude advisors in parallel with synthesis. Use for second opinions, planning features, debugging, researching APIs, reviewing code, architecture decisions, or alternative perspectives. Use this whenever the user wants advice, says "what do you think", or would benefit from multiple viewpoints.
-argument-hint: "[prompt]"
+description: Multi-AI counsel system. Query Gemini, Codex, Claude advisors in parallel with synthesis. Use for second opinions, plan synthesis, debugging, researching APIs, reviewing code, architecture decisions, or alternative perspectives. Use this whenever the user wants advice, says "what do you think", asks for multiple viewpoints, or would benefit from a second opinion.
+argument-hint: "[prompt or competing plans]"
 allowed-tools: Bash, Read, Glob, Grep, Task
 # Note: Write/Edit intentionally excluded - magi is advisory only
 ---
 
 # Magi
 
-Query AI advisors for multi-perspective counsel.
+Multi-advisor counsel: query AI advisors, normalize results, synthesize agreement
+and disagreement, return one recommendation with inspectable evidence.
 
-## Usage
+The workflow is host-neutral. Host adapters and provider cards supply execution
+details; the protocol stays the same whether you're in Claude Code or Codex.
 
-If `$ARGUMENTS` is empty, show usage examples. Otherwise, query all three advisors with the prompt.
+## When to Use
+
+- The user wants multiple perspectives or says "what do you think"
+- Architecture, design, or implementation decisions with real tradeoffs
+- Debugging strategy where blind spots matter
+- Competing plans or proposals that need blending
+- Code review or research where breadth adds value
 
 ## When NOT to Use
 
-- **Trivial questions** — if you already know the answer, magi adds latency for no value
-- **Time-sensitive work** — advisor queries take 30-60s; skip when speed matters more than breadth
-- **Subjective preferences** — style choices, naming conventions; advisors won't converge
+- Trivial questions where you already know the answer — magi adds 30-60s latency
+- Subjective style preferences with no meaningful tradeoffs
+- Time-sensitive execution where the user wants action, not counsel
+- Solo deep reasoning — use critical-thinking instead
 
-## Querying Advisors
+## Modes
 
-Run as a **single background Task** that queries all advisors and returns the complete synthesis:
+### Counsel (default)
+
+One question, one decision. Each advisor gets the same prompt with enough project
+context to avoid generic answers.
+
+### Plan Synthesis
+
+The user has 2-3 competing plans. Each advisor identifies what each plan does
+better, what it misses, and proposes a hybrid. Output includes a conflict table:
+
+```markdown
+| Decision Point | Plan A | Plan B | Hybrid Choice | Reasoning |
+|---|---|---|---|---|
+```
+
+## Workflow
+
+### Step 1: Identify Host
+
+Determine which environment you're running in — this controls how advisors are
+invoked and what concurrency primitives exist.
+
+- **Claude Code**: [hosts/claude.md](hosts/claude.md)
+- **Codex**: [hosts/codex.md](hosts/codex.md)
+
+### Step 2: Build Advisor Roster
+
+Start with the host-native local advisor, then add external advisors.
+
+**Why this order:** The local advisor is always available and free. External
+advisors need CLI tools, API keys, and permissions — they may fail.
+
+**Never double-count the host.** If you're running in Claude, don't launch
+`claude -p` as a second advisor (causes session contention and hangs). If you're
+in Codex, don't launch `codex exec` (duplicates the host and may fail in sandbox).
+The host IS the local advisor already.
+
+Provider details and CLI reference: [reference.md](reference.md)
+
+### Step 3: Query Advisors in Parallel
+
+**On Claude Code:** Run as a single background Task that queries all advisors and
+returns the complete synthesis. This keeps the main thread clean — it only receives
+the final report, not partial results.
 
 ```
 Task:
@@ -35,106 +87,120 @@ Task:
     **User's question**: [prompt]
 
     **Instructions**:
-    1. Run these two Bash commands in parallel:
+    1. Run these Bash commands in parallel for external advisors:
        - gemini -p "[prompt]" --model gemini-3.1-pro-preview --sandbox -o text
        - codex exec --sandbox read-only --skip-git-repo-check -- "[prompt]"
-    2. Also formulate your own response as the Claude advisor
+    2. Formulate your own response as the Claude advisor
     3. Wait for ALL results before proceeding
-    4. If Gemini fails with 429/capacity error:
-       - Wait 60 seconds, retry with gemini-3.1-pro-preview
-       - If still fails, note "Gemini unavailable" and proceed
-    5. If EITHER command fails with permission denied ("denied by policy"):
-       - STOP immediately
-       - Do NOT proceed with Claude-only synthesis
-       - Return ONLY this setup message:
-
-       ## Magi Setup Required
-
-       The magi skill needs permission to run external AI advisors.
-
-       Add these entries to your `.claude/settings.local.json` permissions.allow array:
-       - `"Bash(gemini *)"`
-       - `"Bash(codex *)"`
-
-       Then restart Claude Code and try again.
-
-    **Output format** (use exactly):
-
-    ## Quick Answer
-    [1-2 sentence recommendation]
-
-    <details>
-    <summary>Gemini Response</summary>
-
-    [Full Gemini response or "Unavailable: [reason]"]
-
-    </details>
-
-    <details>
-    <summary>Codex Response</summary>
-
-    [Full Codex response or "Unavailable: [reason]"]
-
-    </details>
-
-    <details>
-    <summary>Claude Response</summary>
-
-    [Your analysis as Claude advisor]
-
-    </details>
-
-    ## Synthesis
-    | Advisor | Key Insight |
-    |---------|-------------|
-    | Gemini | ... |
-    | Codex | ... |
-    | Claude | ... |
-
-    **Consensus**: [What they agreed on]
-    **Conflicts**: [Disagreements and resolution]
-    **Recommendation**: [Your synthesized advice]
+    4. If Gemini fails with 429/capacity: wait 60s, retry once, then skip
+    5. If EITHER command fails with "denied by policy": STOP — return only
+       the setup message (see Failure Handling below)
+    6. Normalize each result and synthesize per the output format below
 ```
 
-This ensures the main thread receives both individual responses (collapsible) and the synthesis.
+**On Codex:** Use the current session as the local advisor. Launch external CLIs
+for the other advisors:
 
-## Handling Failures
+```bash
+# Gemini
+gemini -p "[prompt]" --model gemini-3.1-pro-preview --sandbox -o text
 
-Claude (Task subagent) always succeeds - it's internal.
-Gemini and Codex (external CLIs) may fail.
-
-| Available | Action |
-|-----------|--------|
-| 3/3 | Full synthesis |
-| 2/3 | Partial synthesis, note which advisor was unavailable |
-| 1/3 (Claude only) | Only if failures are capacity/network errors. Return Claude's response with note about unavailable advisors. |
-| Permission denied | **STOP** - do not synthesize, show setup instructions instead |
-
-### Error Handling
-
-| Error Type | Action |
-|------------|--------|
-| Permission denied | **STOP** - show setup instructions below |
-| 429 / capacity | Wait 60s → retry pro → proceed without if still fails |
-| Auth error / missing API key | Suggest `~/.gemini/.env` setup (see below) or `codex login` |
-| CLI not found | Link to [reference.md](reference.md) for install |
-| Network error | Retry once |
-
-Do not fall back to Claude-only for permission errors — the value of magi is multi-perspective counsel, and a Claude-only response is just a normal conversation. The user should fix permissions so they get what they asked for. Show the setup message from the subagent template above.
-
-**Gemini API key setup** (show for "must specify GEMINI_API_KEY" errors):
+# Claude (use JSON for reliable error detection)
+claude -p "[prompt]" --output-format json
 ```
-The Gemini CLI stores your API key in encrypted storage, but non-interactive
-mode (used by magi) only reads from environment variables / .env files.
 
-Fix: Create ~/.gemini/.env with your API key:
-  echo 'GEMINI_API_KEY=your-key-here' > ~/.gemini/.env
-  chmod 600 ~/.gemini/.env
+For Claude JSON output, check `is_error` before normalizing — `true` means auth
+or other failure. See [hosts/codex.md](hosts/codex.md) for full details.
 
-Get your key from https://aistudio.google.com/app/apikey
-or extract the one already stored by Gemini CLI:
-  node --input-type=module -e "import{loadApiKey}from'$(brew --prefix)/Cellar/gemini-cli/$(gemini --version)/libexec/lib/node_modules/@google/gemini-cli/node_modules/@google/gemini-cli-core/dist/src/core/apiKeyCredentialStorage.js';const k=await loadApiKey();process.stdout.write(k??'')"
+### Step 4: Normalize Results
+
+Every advisor response becomes:
+
+```yaml
+advisor_id: "gemini|codex|claude"
+status: "ok|unavailable|blocked|failed"
+summary: "1-3 sentence essence of the advisor's position"
+content: "full response or unavailability message"
 ```
+
+**Why normalize:** Without this, synthesis devolves into comparing apples to
+oranges. Structured results make agreement and disagreement explicit, and let
+the synthesizer work from a consistent shape.
+
+Status meanings:
+- `ok` — usable content returned
+- `unavailable` — dependency missing or not configured (tolerable)
+- `blocked` — host policy prevented execution (setup problem — see Failure Handling)
+- `failed` — execution attempted but errored
+
+### Step 5: Synthesize
+
+This is the step that makes magi more than fan-out plus transcript dumping.
+Without synthesis, the user has to read three responses and do the comparison
+work themselves.
+
+| Pattern | When | Action |
+|---|---|---|
+| **Consensus** | Advisors mostly agree | Proceed, but note shared blind spots |
+| **Complementary** | Different but compatible | Combine strongest non-overlapping insights |
+| **Conflict** | Direct contradiction | Compare evidence quality, prefer simpler/reversible |
+| **Gap** | One advisor silent | Note the gap; do not invent agreement |
+
+**On conflicts:** Good evidence is specific, testable, or grounded in project
+constraints. Weak evidence is vague confidence without support. When in doubt,
+prefer existing project patterns.
+
+Answer these explicitly:
+1. What did the advisors broadly agree on?
+2. Where did they disagree?
+3. Which disagreements matter vs style-level noise?
+4. What decision best fits the actual project context?
+5. What uncertainty remains?
+
+See [synthesis-guide.md](synthesis-guide.md) for the full report template. Label the
+host-native advisor by its actual name (Claude or Codex), not a generic "local
+advisor" — the user should see which model said what.
+
+### Step 6: Review (when needed)
+
+Add a separate review pass when:
+- The decision is high-stakes or will directly drive implementation
+- Advisors materially disagree
+- The synthesis collapsed important nuance
+
+The reviewer inspects the synthesized artifact for false consensus, dropped
+caveats, overweighting one advisor, or hard-to-reverse recommendations. It does
+not re-run the entire council.
+
+## Failure Handling
+
+| Error Type | Action | Why |
+|---|---|---|
+| Permission denied | **STOP** — show host-specific setup guidance | Magi's value is multi-perspective. Single-advisor fallback is just a normal conversation |
+| 429 / capacity | Wait 60s → retry → proceed without | Gemini pro preview has limited capacity |
+| Auth / missing API key | Show setup instructions per [reference.md](reference.md) | Non-interactive CLI mode needs explicit env vars |
+| CLI not found | Show install instructions per [reference.md](reference.md) | |
+| Network error | Retry once, then mark unavailable | |
+
+**Degraded council rules:**
+- 3/3 advisors → full synthesis
+- 2/3 advisors → partial synthesis, note who's missing and why
+- 1/3 (host-only) → only if failures are capacity/network. State it's single-advisor
+- Permission blocked → **STOP**, do not synthesize. Show setup message:
+
+```
+## Magi Setup Required
+
+The magi skill needs permission to run external AI advisors.
+
+Add these to your `.claude/settings.local.json` permissions.allow array:
+- "Bash(gemini *)"
+- "Bash(codex *)"
+
+Then restart Claude Code and try again.
+```
+
+(Codex hosts: show Codex-specific sandbox/approval guidance instead.)
 
 ## Usage Examples
 
@@ -142,15 +208,18 @@ When `$ARGUMENTS` is empty, show:
 
 ```
 Usage:
-  /magi "prompt"    # Query all three advisors + synthesis
+  /magi "prompt"                     # Counsel mode (default)
+  /magi "Plan A vs Plan B"           # Plan synthesis mode
 
 Examples:
-  /magi "How should we implement caching?"
-  /magi "What's the best approach for authentication?"
+  /magi "How should we implement caching for this service?"
+  /magi "What's the best approach for authentication here?"
   /magi "Review this architecture for potential issues"
+  /magi "Compare these two migration strategies and recommend a hybrid"
 ```
 
 ## References
 
-- Advisor capabilities and CLI details: [reference.md](reference.md)
+- Provider capabilities and CLI details: [reference.md](reference.md)
 - Synthesis patterns and report template: [synthesis-guide.md](synthesis-guide.md)
+- Host adapters: [hosts/claude.md](hosts/claude.md), [hosts/codex.md](hosts/codex.md)
