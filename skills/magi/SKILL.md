@@ -89,7 +89,8 @@ Task:
     **Instructions**:
     1. Run these Bash commands in parallel for external advisors:
        - gemini -p "[prompt]" --model gemini-3.1-pro-preview --sandbox -o text
-       - codex exec --sandbox read-only --skip-git-repo-check -- "[prompt]"
+       - Codex: prefer plugin companion if installed (see providers/codex.md),
+         fall back to: codex exec --sandbox read-only --skip-git-repo-check -- "[prompt]"
     2. Formulate your own response as the Claude advisor
     3. Wait for ALL results before proceeding
     4. If Gemini fails with 429/capacity: wait 60s, retry once, then skip

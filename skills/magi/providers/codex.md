@@ -7,11 +7,21 @@ execution-focused advice.
 
 ## Transport
 
+Prefer the Codex plugin companion script when installed — it uses the App Server
+(persistent connection, broker for reuse) instead of one-shot CLI invocations.
+
+**Plugin (preferred):**
+```bash
+CODEX_COMPANION="${CLAUDE_PLUGIN_ROOT:-$HOME/.claude/plugins/cache/openai-codex/codex}/scripts/codex-companion.mjs"
+node "$CODEX_COMPANION" task --read-only --json "[prompt]"
+```
+
+**CLI (fallback):**
 ```bash
 codex exec --sandbox read-only --skip-git-repo-check -- "[prompt]"
 ```
 
-| Flag | Purpose |
+| Flag (CLI) | Purpose |
 |------|---------|
 | `exec` | Non-interactive mode |
 | `--sandbox` | `read-only`, `workspace-write`, `danger-full-access` |
@@ -21,6 +31,8 @@ codex exec --sandbox read-only --skip-git-repo-check -- "[prompt]"
 ## Setup
 
 **Install**: `npm install -g @openai/codex && codex login`
+
+**Plugin** (optional, better transport): `/plugin marketplace add openai/codex-plugin-cc && /plugin install codex@openai-codex`
 
 **Config**: Set `model_reasoning_effort = "high"` in `~/.codex/config.toml`
 
