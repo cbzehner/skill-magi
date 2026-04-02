@@ -45,7 +45,7 @@ Get a key from https://aistudio.google.com/app/apikey
 codex exec --sandbox read-only --skip-git-repo-check -- "$(cat <<'PROMPT'
 [advisor prompt]
 PROMPT
-)"
+)" < /dev/null
 ```
 
 | Flag | Purpose |

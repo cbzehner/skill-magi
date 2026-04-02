@@ -95,12 +95,16 @@ PROMPT_FILE=$(mktemp)
 cat <<'PROMPT' > "$PROMPT_FILE"
 [advisor prompt]
 PROMPT
-codex exec --sandbox read-only --skip-git-repo-check -- "$(cat "$PROMPT_FILE")"
+codex exec --sandbox read-only --skip-git-repo-check -- "$(cat "$PROMPT_FILE")" < /dev/null
 rm "$PROMPT_FILE"
 ```
 
 The `<<'PROMPT'` (single-quoted delimiter) prevents shell expansion inside
 the heredoc. This is critical.
+
+**Stdin:** Always redirect `< /dev/null` for `codex exec`. Inside subagents,
+stdin is an open pipe that never sends EOF, causing codex to hang forever
+waiting for additional input — even when a prompt argument is provided.
 
 **On Claude Code:** Run as a single background Task that queries all advisors and
 returns the complete synthesis.
@@ -119,7 +123,7 @@ Task:
     1. Run these Bash commands in parallel for external advisors
        (use heredocs for prompt safety — never raw string interpolation):
        - gemini -p "$(cat <<'PROMPT' ... PROMPT)" --model gemini-3.1-pro-preview --sandbox -o json
-       - codex exec --sandbox read-only --skip-git-repo-check -- "$(cat <<'PROMPT' ... PROMPT)"
+       - codex exec --sandbox read-only --skip-git-repo-check -- "$(cat <<'PROMPT' ... PROMPT)" < /dev/null
        (see reference.md for full CLI flags)
     2. Formulate your own response as the Claude advisor
     3. Wait for ALL results before proceeding
