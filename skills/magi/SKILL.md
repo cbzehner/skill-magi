@@ -11,9 +11,6 @@ allowed-tools: Bash, Read, Glob, Grep, Task, Write
 Multi-advisor counsel: query AI advisors, normalize results, synthesize agreement
 and disagreement, return one recommendation with inspectable evidence.
 
-The workflow is host-neutral. Host adapters and provider cards supply execution
-details; the protocol stays the same whether you're in Claude Code or Codex.
-
 ## When to Use
 
 - The user wants multiple perspectives or says "what do you think"
@@ -48,33 +45,20 @@ better, what it misses, and proposes a hybrid. Output includes a conflict table:
 
 ## Workflow
 
-### Step 1: Identify Host
-
-Determine which environment you're running in — this controls how advisors are
-invoked and what concurrency primitives exist.
-
-- **Claude Code**: [hosts/claude.md](hosts/claude.md)
-- **Codex**: [hosts/codex.md](hosts/codex.md)
-
-### Step 2: Build Advisor Roster
+### Step 1: Build Advisor Roster
 
 Start with the host-native local advisor, then add external advisors.
 
-**Why this order:** The local advisor is always available and free. External
-advisors need CLI tools, API keys, and permissions — they may fail.
+**Never double-count the host.** If you're running in Claude Code, don't launch
+`claude -p` as a second advisor (causes session contention). If you're in Codex,
+don't launch `codex exec` (duplicates the host). The host IS the local advisor.
 
-**Never double-count the host.** If you're running in Claude, don't launch
-`claude -p` as a second advisor (causes session contention and hangs). If you're
-in Codex, don't launch `codex exec` (duplicates the host and may fail in sandbox).
-The host IS the local advisor already.
+See [reference.md](reference.md) for provider CLI details, setup, and failure modes.
 
-Provider details and CLI reference: [reference.md](reference.md)
-
-### Step 3: Query Advisors in Parallel
+### Step 2: Query Advisors in Parallel
 
 **On Claude Code:** Run as a single background Task that queries all advisors and
-returns the complete synthesis. This keeps the main thread clean — it only receives
-the final report, not partial results.
+returns the complete synthesis.
 
 ```
 Task:
@@ -89,7 +73,7 @@ Task:
     **Instructions**:
     1. Run these Bash commands in parallel for external advisors:
        - gemini -p "[advisor prompt]" --model gemini-3.1-pro-preview --sandbox -o json
-       - Codex: prefer plugin companion if installed (see providers/codex.md),
+       - Codex: prefer plugin companion if installed (see reference.md),
          fall back to: codex exec --sandbox read-only --skip-git-repo-check -- "[advisor prompt]"
     2. Formulate your own response as the Claude advisor
     3. Wait for ALL results before proceeding
@@ -104,50 +88,29 @@ Task:
     In your response, explicitly state:
     - What assumptions you are making
     - What information you don't have or couldn't verify
-    - What implications follow from your recommendation, especially anything hard to reverse"
+    - What implications follow from your recommendation, especially anything hard to reverse
+    - What evidence you're grounding your response in (sources, docs, code inspected, commands run)"
+
+    **Capability framing** — append per provider:
+    - Gemini: "You have native web search. Ground claims in current sources where relevant — cite what you find."
+    - Codex: "You can execute shell commands in a sandboxed environment. If a factual claim is quickly verifiable by running code, verify it."
+    - Claude: (no additional framing — already has project context)
 ```
 
-**On Codex:** Use the current session as the local advisor. Launch external CLIs
-for the other advisors:
+**On Codex:** Use the current session as the local advisor. Launch external CLIs:
 
 ```bash
 # Gemini (JSON for metrics — parse response field for content)
-gemini -p "[prompt]" --model gemini-3.1-pro-preview --sandbox -o json
+gemini -p "[advisor prompt]" --model gemini-3.1-pro-preview --sandbox -o json
 
-# Claude (use JSON for reliable error detection)
-claude -p "[prompt]" --output-format json
+# Claude (JSON for reliable error detection)
+claude -p "[advisor prompt]" --output-format json
 ```
 
 For Claude JSON output, check `is_error` before normalizing — `true` means auth
-or other failure. See [hosts/codex.md](hosts/codex.md) for full details.
+or other failure.
 
-### Step 3.5: Assess Tier
-
-Determine how much process depth this question needs. Three tiers, each a
-strict superset of the previous (mirroring the critical-thinking skill's
-Tier 1/2/3 escalation):
-
-| Tier | Name | Process | When |
-|------|------|---------|------|
-| 1 | Quick Counsel | query → normalize → synthesize | Default. Straightforward questions, advisors broadly agree |
-| 2 | Structured Counsel | query → normalize → **critique round** → synthesize | Advisors materially disagree, OR question involves decisions with real tradeoffs |
-| 3 | Deep Counsel | query → normalize → **critique round** → synthesize → **review** | User passes `--debate`, OR Tier 2 conditions + hard-to-reverse consequences |
-
-**`--debate` override:** Always Tier 3, no further assessment needed.
-
-**Two-phase assessment** (when `--debate` is not passed):
-
-1. **Pre-query (before Step 3):** Set an initial tier floor from the question.
-   Does it involve architecture, data models, public APIs, security, or other
-   decisions that are hard to reverse? If yes → floor is Tier 2.
-2. **Post-normalization (after Step 4):** Evaluate actual results. Are the
-   advisors' assumptions incompatible? Do core recommendations contradict?
-   If yes → escalate to Tier 2 (or to Tier 3 if already at Tier 2 and
-   consequences are irreversible). Never downgrade from the pre-query floor.
-
-Report the selected tier and escalation reason in the session metrics.
-
-### Step 4: Normalize Results
+### Step 3: Normalize Results
 
 Every advisor response becomes:
 
@@ -158,52 +121,45 @@ summary: "1-3 sentence essence of the advisor's position"
 assumptions: ["beliefs taken for granted in this response"]
 information_gaps: ["what the advisor didn't know or couldn't verify"]
 implications: ["consequences if this advice is followed, especially hard-to-reverse ones"]
+evidence_basis: ["sources cited, code inspected, commands run, docs referenced"]
 content: "full response or unavailability message"
 ```
 
-The three analytical fields (assumptions, information_gaps, implications) are
-drawn from the Paul-Elder Elements of Thought. They give the synthesizer
-observable, verifiable inputs rather than unreliable self-reported confidence.
-The orchestrator prompt must instruct each advisor to surface these explicitly.
+The four analytical fields give the synthesizer observable, verifiable inputs
+rather than unreliable self-reported confidence:
 
-- `assumptions` — what the advisor took for granted. When two advisors disagree,
-  it's often because they assumed different things.
-- `information_gaps` — what the advisor didn't know. More useful than confidence
-  because it's observable: "I couldn't verify whether X supports Y" beats
-  "I'm 70% sure."
+- `assumptions` — what the advisor took for granted. Incompatible assumptions
+  between advisors are often the root cause of apparent disagreement.
+- `information_gaps` — what the advisor didn't know. "I couldn't verify X"
+  beats "I'm 70% sure."
 - `implications` — where the advice leads, especially irreversible consequences.
-  Feeds the existing synthesis principle of "prefer simpler/reversible."
+- `evidence_basis` — what grounds the response. An advisor that cites docs or
+  ran code carries more weight than one reasoning from general knowledge.
 
-These fields are populated only when status is `ok`. For other statuses, omit them.
-
-**Why normalize:** Without this, synthesis devolves into comparing apples to
-oranges. Structured results make agreement and disagreement explicit, and let
-the synthesizer work from a consistent shape.
+Populated only when status is `ok`. Omit for other statuses.
 
 Status meanings:
 - `ok` — usable content returned
 - `unavailable` — dependency missing or not configured (tolerable)
-- `blocked` — host policy prevented execution (setup problem — see Failure Handling)
+- `blocked` — host policy prevented execution (see Failure Handling)
 - `failed` — execution attempted but errored
 
-### Step 4.5: Critique Round (Tier 2+ only)
+### Step 3.5: Critique Round (--debate only)
 
-At Tier 2 or above (or when `--debate` is passed), run an anonymized
-cross-critique before synthesis. See [critique-round.md](critique-round.md)
-for the full protocol.
+When the user passes `--debate`, run an anonymized cross-critique before
+synthesis. See [critique-round.md](critique-round.md) for the full protocol.
 
 In brief: anonymize each advisor's summary, feed each advisor the other two
-summaries, and ask them to challenge assumptions, identify logic gaps, and
-flag missing information. Attach critiques to the normalized results before
-passing everything to the synthesizer.
+summaries, ask them to challenge assumptions, identify logic gaps, and flag
+missing information. Attach critiques to the normalized results before
+synthesizing.
 
-Skip this step entirely at Tier 1.
+Without `--debate`, skip this step entirely. The default path is fast:
+query → normalize → synthesize.
 
-### Step 5: Synthesize
+### Step 4: Synthesize
 
 This is the step that makes magi more than fan-out plus transcript dumping.
-Without synthesis, the user has to read three responses and do the comparison
-work themselves.
 
 | Pattern | When | Action |
 |---|---|---|
@@ -212,13 +168,11 @@ work themselves.
 | **Conflict** | Direct contradiction | Compare evidence quality, prefer simpler/reversible |
 | **Gap** | One advisor silent | Note the gap; do not invent agreement |
 
-**On conflicts:** Good evidence is specific, testable, or grounded in project
-constraints. Weak evidence is vague confidence without support. When in doubt,
-prefer existing project patterns. Use the normalized fields to resolve conflicts:
-- Check whether disagreeing advisors made incompatible **assumptions** — resolving
-  the assumption often resolves the conflict
-- Check **information gaps** — an advisor missing key context may have reached a
-  different conclusion for fixable reasons
+**On conflicts:** Use the normalized fields to resolve:
+- Check whether disagreeing advisors made incompatible **assumptions**
+- Check **information gaps** — an advisor missing key context may have reached
+  a different conclusion for fixable reasons
+- Compare **evidence basis** — grounded claims outweigh general reasoning
 - Weight **implications** — prefer recommendations with fewer irreversible consequences
 
 Answer these explicitly:
@@ -226,39 +180,54 @@ Answer these explicitly:
 2. Where did they disagree?
 3. Which disagreements matter vs style-level noise?
 4. What decision best fits the actual project context?
-5. What uncertainty remains (common information gaps across advisors)?
+5. What uncertainty remains (common information gaps)?
 
-See [synthesis-guide.md](synthesis-guide.md) for the full report template. Label the
-host-native advisor by its actual name (Claude or Codex), not a generic "local
-advisor" — the user should see which model said what.
+See [reference.md](reference.md) for the report template. Label the host-native
+advisor by its actual name (Claude or Codex).
 
-### Step 6: Review (when needed)
+### Step 5: Persist Session
 
-Add a separate review pass when:
-- The decision is high-stakes or will directly drive implementation
-- Advisors materially disagree
-- The synthesis collapsed important nuance
+Write the full session to `~/.claude/magi/sessions/YYYY-MM-DD-<slug>.yaml`.
+Create the directory if needed. The slug is the first ~50 chars of the question,
+lowercased, spaces to hyphens, non-alphanumeric removed.
 
-The reviewer inspects the synthesized artifact for false consensus, dropped
-caveats, overweighting one advisor, or hard-to-reverse recommendations. It does
-not re-run the entire council.
+This runs unconditionally — every magi invocation produces a session file.
+Include the file path in the report so the user can find it.
 
-### Step 7: Persist Session
+Session file shape:
 
-After synthesis (and review, if applicable), write the full session to
-`~/.claude/magi/sessions/`. See [sessions.md](sessions.md) for the file
-format and storage details.
-
-This runs unconditionally — every magi invocation produces a session file,
-regardless of tier or whether advisors were unavailable.
+```yaml
+question: "original prompt"
+mode: "counsel|plan-synthesis"
+debate: true|false
+timestamp: "2026-04-02T14:30:00Z"
+duration_s: 47
+advisors:
+  - advisor_id: "claude"
+    status: "ok"
+    wall_time_s: 12
+    tokens: { input: 3200, output: 1800 }  # where available
+    summary: "..."
+    assumptions: [...]
+    information_gaps: [...]
+    implications: [...]
+    evidence_basis: [...]
+    content: "..."
+    critiques_received: [...]  # only present with --debate
+  # ... other advisors
+synthesis:
+  consensus: "..."
+  conflicts: "..."
+  recommendation: "..."
+```
 
 ## Failure Handling
 
 | Error Type | Action | Why |
 |---|---|---|
-| Permission denied | **STOP** — show host-specific setup guidance | Magi's value is multi-perspective. Single-advisor fallback is just a normal conversation |
-| 429 / capacity | Wait 60s → retry → proceed without | Gemini pro preview has limited capacity |
-| Auth / missing API key | Show setup instructions per [reference.md](reference.md) | Non-interactive CLI mode needs explicit env vars |
+| Permission denied | **STOP** — show setup guidance | Magi's value is multi-perspective. Single-advisor fallback is just a normal conversation |
+| 429 / capacity | Wait 60s → retry → proceed without | Gemini has limited capacity |
+| Auth / missing API key | Show setup instructions per [reference.md](reference.md) | |
 | CLI not found | Show install instructions per [reference.md](reference.md) | |
 | Network error | Retry once, then mark unavailable | |
 
@@ -280,7 +249,7 @@ Add these to your `.claude/settings.local.json` permissions.allow array:
 Then restart Claude Code and try again.
 ```
 
-(Codex hosts: show Codex-specific sandbox/approval guidance instead.)
+(Codex hosts: show sandbox/approval guidance instead of settings.local.json.)
 
 ## Usage Examples
 
@@ -288,8 +257,8 @@ When `$ARGUMENTS` is empty, show:
 
 ```
 Usage:
-  /magi "prompt"                     # Counsel mode (default, Tier 1)
-  /magi --debate "prompt"            # Force Tier 3 (critique round + review)
+  /magi "prompt"                     # Counsel mode (default)
+  /magi --debate "prompt"            # Add anonymized critique round
   /magi "Plan A vs Plan B"           # Plan synthesis mode
 
 Examples:
@@ -301,8 +270,5 @@ Examples:
 
 ## References
 
-- Provider capabilities and CLI details: [reference.md](reference.md)
-- Synthesis patterns and report template: [synthesis-guide.md](synthesis-guide.md)
+- Provider CLIs, normalization, and report template: [reference.md](reference.md)
 - Anonymized critique protocol: [critique-round.md](critique-round.md)
-- Session persistence format: [sessions.md](sessions.md)
-- Host adapters: [hosts/claude.md](hosts/claude.md), [hosts/codex.md](hosts/codex.md)

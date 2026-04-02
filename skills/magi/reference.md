@@ -1,56 +1,51 @@
 # Magi Reference
 
-Advisor capabilities, CLI details, and setup instructions. Loaded on demand.
+Provider details, normalization schema, and report template.
 
 ---
 
-## Advisor Capabilities
+## Providers
 
-| Advisor | Model | Strengths | Best For |
-|---------|-------|-----------|----------|
-| Gemini | gemini-3.1-pro-preview | Web search, 1M token context, advanced reasoning | Current info, API docs, library research |
-| Codex | gpt-5.4 (high reasoning) | Fast (Rust-based), fine-grained sandboxing | Quick analysis, CI/CD patterns, security |
-| Claude | Opus 4.6 | Deep reasoning, code expertise | Architecture, code review, complex problems |
+| Advisor | Model | Unique Capability | Best For |
+|---------|-------|-------------------|----------|
+| Gemini | gemini-3.1-pro-preview | Native web search (`google_web_search`) | Current info, API docs, library research |
+| Codex | gpt-5.4 | Sandboxed code execution | Verification, CI/CD patterns, security |
+| Claude | Opus 4.6 | Deep reasoning, project context | Architecture, code review, complex problems |
 
----
-
-## CLI Reference
-
-### Gemini
+### Gemini CLI
 
 ```bash
-gemini -p "[prompt]" --model gemini-3.1-pro-preview --sandbox -o text
+gemini -p "[prompt]" --model gemini-3.1-pro-preview --sandbox -o json
 ```
 
 | Flag | Purpose |
 |------|---------|
-| `-p` / `--prompt` | Non-interactive mode (required for subprocess use) |
-| `--model` | `gemini-3.1-pro-preview` (max reasoning) |
-| `--sandbox` | Read-only mode, no file writes |
-| `-o` | Output format: `text`, `json`, `stream-json` |
+| `-p` | Non-interactive mode |
+| `--model` | Model selection |
+| `--sandbox` | Read-only, no file writes |
+| `-o json` | JSON output with `response` (content) and `stats` (metrics) |
 
-**Capacity errors**: Pro preview has limited capacity. On 429: wait 60s → retry
-with same model → skip if still fails.
+**Metrics from JSON:** Token counts in `stats.models.<model>.tokens` (input,
+candidates, thoughts, total). Latency in `stats.models.<model>.api.totalLatencyMs`.
 
-**Install**: `npm install -g @google/gemini-cli && gemini --login`
+**Setup:** `npm install -g @google/gemini-cli && gemini --login`
 
-**Non-interactive auth**: The CLI's non-interactive mode (`-p` flag) does not
-read stored credentials. Create `~/.gemini/.env` with `GEMINI_API_KEY=your-key`
-for subprocess use.
+**Non-interactive auth:** `-p` mode doesn't read stored credentials. Create
+`~/.gemini/.env` with `GEMINI_API_KEY=your-key` for subprocess use.
+Get a key from https://aistudio.google.com/app/apikey
 
-For "must specify GEMINI_API_KEY" errors, show:
+**Capacity errors:** On 429: wait 60s → retry once → skip.
+
+### Codex CLI
+
+Prefer the plugin companion when installed:
+
+```bash
+CODEX_COMPANION="${CLAUDE_PLUGIN_ROOT:-$HOME/.claude/plugins/cache/openai-codex/codex}/scripts/codex-companion.mjs"
+node "$CODEX_COMPANION" task --read-only --json "[prompt]"
 ```
-The Gemini CLI stores your API key in encrypted storage, but non-interactive
-mode (used by magi) only reads from environment variables / .env files.
 
-Fix: Create ~/.gemini/.env with your API key:
-  echo 'GEMINI_API_KEY=your-key-here' > ~/.gemini/.env
-  chmod 600 ~/.gemini/.env
-
-Get your key from https://aistudio.google.com/app/apikey
-```
-
-### Codex
+Fallback:
 
 ```bash
 codex exec --sandbox read-only --skip-git-repo-check -- "[prompt]"
@@ -60,24 +55,24 @@ codex exec --sandbox read-only --skip-git-repo-check -- "[prompt]"
 |------|---------|
 | `exec` | Non-interactive mode |
 | `--sandbox` | `read-only`, `workspace-write`, `danger-full-access` |
-| `--skip-git-repo-check` | Run outside git repositories |
-| `--model` | Model override (default: gpt-5.4) |
+| `--skip-git-repo-check` | Run outside git repos |
 
-**Config**: `model_reasoning_effort = "high"` set in `~/.codex/config.toml`
+**Metrics:** Aggregate token count only (single number, no in/out split). No
+timing from CLI — measure wall time externally.
 
-**Install**: `npm install -g @openai/codex && codex login`
+**Setup:** `npm install -g @openai/codex && codex login`
+
+**Config:** `model_reasoning_effort = "high"` in `~/.codex/config.toml`
 
 ### Claude
 
-Transport depends on host:
-
-**From Claude Code (host-native):** Task subagent with `model: "opus"`.
+**From Claude Code (host-native):** Task subagent — no CLI needed.
 
 ```
 Task:
   subagent_type: "general-purpose"
   model: "opus"
-  prompt: "You are a senior software architect advisor. [prompt]"
+  prompt: "[advisor prompt]"
 ```
 
 Don't use `claude -p` from within Claude Code — causes session contention.
@@ -88,22 +83,29 @@ Don't use `claude -p` from within Claude Code — causes session contention.
 claude -p "[prompt]" --output-format json
 ```
 
-| Flag | Purpose |
-|------|---------|
-| `-p` / `--print` | Non-interactive mode |
-| `--output-format json` | Machine-readable with `is_error` field |
-| `--bare` | Headless mode for subprocess use |
+Check `is_error` before normalizing — `true` means auth or other failure.
 
-**Auth**: Requires existing login session. No env-var auth. Fails fast (~0.25s)
-with "Not logged in" if not authenticated.
+**Metrics from JSON:** `cost_usd`, `duration_ms`, `input_tokens`, `output_tokens`.
 
-**Install**: Bundled with Claude Code desktop, or `npm install -g @anthropic-ai/claude-code`
+**Auth:** Requires existing login. No env-var auth. Fails fast with "Not logged
+in" if not authenticated. Must auth outside sandbox environments first.
+
+**Setup:** `npm install -g @anthropic-ai/claude-code`
+
+### Common Failure Detection
+
+| Error String | Provider | Status | Reason |
+|---|---|---|---|
+| `Not logged in` | Claude | `blocked` | `auth` |
+| `Failed to start OAuth callback server` | Claude | `blocked` | `auth` |
+| `must specify GEMINI_API_KEY` | Gemini | `unavailable` | `auth` |
+| `command not found` | Any | `unavailable` | `missing_cli` |
+| Sandbox/approval rejection | Any | `blocked` | `permission` |
+| Network timeout | Any | `failed` | `network` |
 
 ---
 
 ## Normalization Schema
-
-Every advisor response is normalized to this shape before synthesis:
 
 ```yaml
 advisor_id: "gemini|codex|claude"
@@ -112,67 +114,101 @@ summary: "1-3 sentence essence of the advisor's position"
 assumptions: ["beliefs taken for granted in this response"]
 information_gaps: ["what the advisor didn't know or couldn't verify"]
 implications: ["consequences if this advice is followed, especially hard-to-reverse ones"]
+evidence_basis: ["sources cited, code inspected, commands run, docs referenced"]
 content: "full response or unavailability message"
 ```
 
-The three analytical fields align with the Paul-Elder Elements of Thought
-(Assumptions, Information, Implications). They replace self-reported confidence
-— which LLMs cannot reliably calibrate — with observable, verifiable inputs.
+These fields replace self-reported confidence with observable inputs:
 
-**Field guidance for the synthesizer:**
 - An advisor with many unstated assumptions carries less weight than one that
   made its assumptions explicit and justified them
-- Incompatible assumptions between advisors are often the root cause of
-  apparent disagreement — resolving the assumption resolves the conflict
+- Incompatible assumptions between advisors often cause apparent disagreement —
+  resolving the assumption resolves the conflict
 - Information gaps that overlap across advisors represent shared blind spots
+- An advisor that grounded its response in evidence (cited docs, ran code,
+  searched the web) carries more weight than one reasoning from general knowledge
 - Implications flagged as hard-to-reverse should bias toward the more cautious
   recommendation
 
-Fields are populated only when `status: "ok"`. Omit them for other statuses.
+Fields populated only when `status: "ok"`. Omit for other statuses.
 
 ---
 
-## Prompt Templates
+## Synthesis Patterns
 
-### Planning
-```
-Task: [description]
-Context: [codebase context]
-Constraints: [limitations]
+| Pattern | When | Action |
+|---------|------|--------|
+| **Consensus** | Advisors mostly agree | Proceed; watch for shared blind spots |
+| **Complementary** | Different but compatible | Combine strongest non-overlapping insights |
+| **Conflict** | Direct contradiction | Compare evidence quality, prefer simpler/reversible |
+| **Gap** | One advisor silent | Note gap; do not invent agreement |
 
-Provide: 1) Approach 2) Steps 3) Risks 4) Alternatives
-```
-
-### Debugging
-```
-Error: [message]
-Code: [relevant code]
-Context: [what was attempted]
-
-Provide: 1) Likely cause 2) Investigation steps 3) Fix 4) Prevention
-```
-
-### Research
-```
-Topic: [question]
-Context: [why needed]
-
-Provide: 1) Key findings 2) Sources 3) Applicability 4) Caveats
-```
-
-### Code Review
-```
-Code: [code]
-Intent: [what it should do]
-
-Provide: 1) Correctness 2) Issues 3) Improvements 4) Style
-```
+Good evidence = specific references, tested claims, grounded in project
+constraints. Weak evidence = vague confidence without support. When in doubt,
+prefer existing project patterns.
 
 ---
 
-## Provider Cards
+## Report Template
 
-For host-specific failure modes and transport quirks, see:
-- [providers/gemini.md](providers/gemini.md)
-- [providers/codex.md](providers/codex.md)
-- [providers/claude.md](providers/claude.md)
+Replace `[Host Advisor]` with Claude or Codex.
+
+```markdown
+## Quick Answer
+[1-2 sentence actionable recommendation]
+
+## Session Metrics
+| Advisor | Status | Wall Time | Tokens (in/out) |
+|---------|--------|-----------|-----------------|
+| [Host Advisor] | ✓/✗ | Xs | Nk / Nk |
+| Gemini | ✓/✗ | Xs | Nk / Nk |
+| Codex | ✓/✗ | Xs | Nk total |
+| Critique | ✓/— | Xs | — |
+| **Total** | | **Xs** | |
+
+Debate: [yes/no]
+
+<details>
+<summary>Gemini Response</summary>
+
+[Full response or "Unavailable: [reason]"]
+
+</details>
+
+<details>
+<summary>Codex Response</summary>
+
+[Full response or "Unavailable: [reason]"]
+
+</details>
+
+<details>
+<summary>[Host Advisor] Response</summary>
+
+[Full response or "Unavailable: [reason]"]
+
+</details>
+
+## Synthesis
+| Advisor | Key Insight |
+|---------|-------------|
+| Gemini | ... |
+| Codex | ... |
+| [Host Advisor] | ... |
+
+**Consensus**: [What they agreed on]
+**Conflicts**: [Disagreements and resolution]
+**Recommendation**: [Your synthesized advice]
+
+_Session saved to `[file path]`_
+```
+
+**Metrics availability:**
+- **Gemini** (`-o json`): input/output/thoughts tokens + API latency
+- **Codex** (`exec`): aggregate token count only, no timing
+- **Claude** (host-native): varies; `-p --json` reports full metrics
+
+Use `—` for unavailable metrics. Never estimate or fabricate.
+
+Simple queries may skip collapsible individual responses — Quick Answer +
+Session Metrics + Synthesis table is sufficient.
