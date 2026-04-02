@@ -8,7 +8,7 @@ research, and outside-in framing.
 ## Transport
 
 ```bash
-gemini -p "[prompt]" --model gemini-3.1-pro-preview --sandbox -o text
+gemini -p "[prompt]" --model gemini-3.1-pro-preview --sandbox -o json
 ```
 
 | Flag | Purpose |
@@ -16,7 +16,11 @@ gemini -p "[prompt]" --model gemini-3.1-pro-preview --sandbox -o text
 | `-p` | Non-interactive mode (required for subprocess use) |
 | `--model` | `gemini-3.1-pro-preview` (max reasoning) |
 | `--sandbox` | Read-only, no file writes |
-| `-o text` | Plain text output |
+| `-o json` | JSON output — includes `response` (content) and `stats` (metrics) |
+
+**Parsing JSON output:** The response content is in the `response` field.
+Token metrics are in `stats.models.<model>.tokens` (input, prompt, candidates,
+thoughts, cached, total). API latency is in `stats.models.<model>.api.totalLatencyMs`.
 
 ## Setup
 
@@ -40,6 +44,15 @@ Get a key from https://aistudio.google.com/app/apikey
 | `unavailable` | `auth` | Show `.env` setup instructions above |
 | `unavailable` | `missing_cli` | Show install command above |
 | `blocked` | `permission` | Host blocks Bash execution — show host-specific setup |
+
+## Capability Framing
+
+Append to the advisor prompt (after the shared question):
+
+> "You have native web search via google_web_search. Ground claims in current
+> sources where relevant — cite what you find."
+
+This references a verified built-in capability, not an aspirational persona.
 
 ## Notes
 

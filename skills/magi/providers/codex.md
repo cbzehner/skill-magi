@@ -45,6 +45,15 @@ codex exec --sandbox read-only --skip-git-repo-check -- "[prompt]"
 | `unavailable` | `missing_cli` | Show install command above |
 | `blocked` | `permission` | Host blocks subprocess execution |
 
+## Capability Framing
+
+Append to the advisor prompt (after the shared question):
+
+> "You can execute shell commands in a sandboxed environment. If a factual
+> claim is quickly verifiable by running code, verify it."
+
+This references a verified built-in capability, not an aspirational persona.
+
 ## Notes
 
 - If the current host IS Codex, do not launch `codex exec` as a second advisor

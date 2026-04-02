@@ -44,6 +44,17 @@ so the user sees which model said what.
 ## Quick Answer
 [1-2 sentence actionable recommendation]
 
+## Session Metrics
+| Advisor | Status | Wall Time | Tokens (in/out) |
+|---------|--------|-----------|-----------------|
+| [Host Advisor] | ✓/✗ | Xs | Nk / Nk |
+| Gemini | ✓/✗ | Xs | Nk / Nk |
+| Codex | ✓/✗ | Xs | Nk total |
+| Critique | ✓/— | Xs | — |
+| **Total** | | **Xs** | |
+
+Tier: [1/2/3] [escalation reason if not Tier 1]
+
 <details>
 <summary>Gemini Response</summary>
 
@@ -77,4 +88,18 @@ so the user sees which model said what.
 **Recommendation**: [Your synthesized advice]
 ```
 
-Simple queries may only need Quick Answer + Synthesis table.
+**Metrics availability by provider:**
+- **Gemini** (`-o json`): `stats.models.*.tokens` for input/output/thoughts,
+  `stats.models.*.api.totalLatencyMs` for API latency. Wall time measured by
+  orchestrator.
+- **Codex** (`exec`): aggregate token count only (single number, no in/out split).
+  No timing from CLI — wall time measured by orchestrator.
+- **Claude** (host-native Task): token counts and cost available from task metadata
+  when running via `-p --output-format json`. From Agent/Task tool, usage may be
+  reported in task output.
+
+Use `—` for any metric a provider doesn't report. Never estimate or fabricate
+metrics.
+
+Simple queries may only need Quick Answer + Session Metrics + Synthesis table
+(skip the collapsible individual responses).

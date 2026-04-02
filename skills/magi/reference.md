@@ -101,6 +101,37 @@ with "Not logged in" if not authenticated.
 
 ---
 
+## Normalization Schema
+
+Every advisor response is normalized to this shape before synthesis:
+
+```yaml
+advisor_id: "gemini|codex|claude"
+status: "ok|unavailable|blocked|failed"
+summary: "1-3 sentence essence of the advisor's position"
+assumptions: ["beliefs taken for granted in this response"]
+information_gaps: ["what the advisor didn't know or couldn't verify"]
+implications: ["consequences if this advice is followed, especially hard-to-reverse ones"]
+content: "full response or unavailability message"
+```
+
+The three analytical fields align with the Paul-Elder Elements of Thought
+(Assumptions, Information, Implications). They replace self-reported confidence
+— which LLMs cannot reliably calibrate — with observable, verifiable inputs.
+
+**Field guidance for the synthesizer:**
+- An advisor with many unstated assumptions carries less weight than one that
+  made its assumptions explicit and justified them
+- Incompatible assumptions between advisors are often the root cause of
+  apparent disagreement — resolving the assumption resolves the conflict
+- Information gaps that overlap across advisors represent shared blind spots
+- Implications flagged as hard-to-reverse should bias toward the more cautious
+  recommendation
+
+Fields are populated only when `status: "ok"`. Omit them for other statuses.
+
+---
+
 ## Prompt Templates
 
 ### Planning

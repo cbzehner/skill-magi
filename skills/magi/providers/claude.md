@@ -93,6 +93,13 @@ Parse `is_error` first — if `true`, the `result` field contains the error mess
 
 All failures are fast (<0.3s) and clean — no hanging in `-p` mode.
 
+## Capability Framing
+
+No additional framing when Claude is the host-native advisor — it already has
+full project context from the Agent/Task tool. When invoked externally (from
+Codex), no special framing needed either; Claude's strengths (architectural
+reasoning, nuanced tradeoffs) are inherent, not tool-dependent.
+
 ## Notes
 
 - In Claude-hosted runs, Claude is the local advisor — no external invocation needed

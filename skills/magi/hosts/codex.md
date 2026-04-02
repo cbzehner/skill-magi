@@ -23,10 +23,10 @@ Launch external CLIs via Bash. If parallel execution is safe, run them
 concurrently. Otherwise, run sequentially — keep the same normalized result shape.
 
 ```bash
-# Gemini
-gemini -p "[prompt]" --model gemini-3.1-pro-preview --sandbox -o text
+# Gemini (use JSON for metrics — parse response field for content)
+gemini -p "[prompt]" --model gemini-3.1-pro-preview --sandbox -o json
 
-# Claude (prefer JSON for reliable error detection)
+# Claude (use JSON for reliable error detection)
 claude -p "[prompt]" --output-format json
 ```
 
