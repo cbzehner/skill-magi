@@ -240,40 +240,50 @@ advisor by its actual name (Claude or Codex).
 
 ### Step 5: Persist Session
 
-Write a session record to `~/.claude/magi/sessions/YYYY-MM-DD-<slug>.yaml`.
+Write a session record to `~/.claude/magi/sessions/YYYY-MM-DD-<slug>.md`.
 Create the directory if needed. The slug is the first ~50 chars of the question,
 lowercased, spaces to hyphens, non-alphanumeric removed.
 
 This runs unconditionally. Include the file path in the report so the user
 can find it.
 
-**Default** — summary record (compact, no full transcripts):
+The file has two parts: a **deterministic header** (written mechanically by
+the orchestrator, not the LLM) and a **narrative body** (written by the LLM
+as natural prose). This eliminates schema drift — the only structured part is
+code-generated, and the only LLM-generated part is unstructured.
 
-```yaml
-question: "original prompt"
-mode: "counsel|plan-synthesis"
-debate: true|false
-timestamp: "2026-04-02T14:30:00Z"
-duration_s: 47
-advisors:
-  - advisor_id: "claude"
-    status: "ok"
-    wall_time_s: 12
-    tokens: { input: 3200, output: 1800 }  # where available
-    summary: "..."
-    assumptions: [...]
-    information_gaps: [...]
-    implications: [...]
-    evidence_basis: [...]
-  # ... other advisors (summary-level only, no full content)
-synthesis:
-  consensus: "..."
-  conflicts: "..."
-  recommendation: "..."
+```markdown
+# Magi Session: YYYY-MM-DD
+**Question**: [original prompt verbatim]
+**Advisors**: claude (ok), gemini (ok), codex (failed)
+
+## Synthesis
+[LLM-generated narrative: what advisors agreed on, where they disagreed,
+which disagreements matter, the recommendation, and remaining uncertainty]
+
+## Claude
+[LLM-generated narrative: the advisor's position, reasoning, key assumptions,
+information gaps, and evidence basis — as flowing prose, not structured fields]
+
+## Gemini
+[same as above]
+
+## Codex
+[same, or a brief failure note if the advisor failed]
 ```
 
-**`--archive`** — includes full advisor content, critique round results,
-and raw provider metrics. Use when you want a complete audit trail.
+**Header rules**: The `# Magi Session` line, `**Question**`, and `**Advisors**`
+lines are filled in by the orchestrator from known values. Do not embellish or
+add extra metadata fields. Token counts, wall times, model versions, and debug
+info are noise for the primary consumer (an LLM reading this back via seance).
+
+**Section headers**: Always use `## Synthesis`, `## Claude`, `## Gemini`,
+`## Codex` — these are predictable grep anchors for the seance skill.
+
+**Narrative body**: Write each section as natural prose. The analytical fields
+from normalization (assumptions, information gaps, implications, evidence basis)
+should inform the narrative but do not need to appear as discrete subsections.
+The LLM reading this back will extract what it needs.
 
 **Privacy:** Never persist secrets, API keys, or credentials. If the user's
 question or gathered context contains sensitive material, the orchestrator
