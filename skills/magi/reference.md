@@ -15,7 +15,10 @@ Provider details, normalization schema, and report template.
 ### Gemini CLI
 
 ```bash
-gemini -p "[prompt]" --model gemini-3.1-pro-preview --sandbox -o json
+gemini -p "$(cat <<'PROMPT'
+[advisor prompt]
+PROMPT
+)" --model gemini-3.1-pro-preview --sandbox -o json
 ```
 
 | Flag | Purpose |
@@ -38,17 +41,11 @@ Get a key from https://aistudio.google.com/app/apikey
 
 ### Codex CLI
 
-Prefer the plugin companion when installed:
-
 ```bash
-CODEX_COMPANION="${CLAUDE_PLUGIN_ROOT:-$HOME/.claude/plugins/cache/openai-codex/codex}/scripts/codex-companion.mjs"
-node "$CODEX_COMPANION" task --read-only --json "[prompt]"
-```
-
-Fallback:
-
-```bash
-codex exec --sandbox read-only --skip-git-repo-check -- "[prompt]"
+codex exec --sandbox read-only --skip-git-repo-check -- "$(cat <<'PROMPT'
+[advisor prompt]
+PROMPT
+)"
 ```
 
 | Flag | Purpose |
@@ -80,7 +77,10 @@ Don't use `claude -p` from within Claude Code — causes session contention.
 **From Codex (external CLI):**
 
 ```bash
-claude -p "[prompt]" --output-format json
+claude -p "$(cat <<'PROMPT'
+[advisor prompt]
+PROMPT
+)" --output-format json
 ```
 
 Check `is_error` before normalizing — `true` means auth or other failure.

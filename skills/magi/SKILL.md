@@ -55,7 +55,52 @@ don't launch `codex exec` (duplicates the host). The host IS the local advisor.
 
 See [reference.md](reference.md) for provider CLI details, setup, and failure modes.
 
+### Step 1.5: Gather Context
+
+Before querying, gather project context to include in advisor prompts.
+External advisors (Gemini, Codex) have no project access — without context
+they give generic answers.
+
+**What to include (in priority order, within ~4000 token budget):**
+1. The user's question verbatim
+2. Relevant code snippets — files the question references or that are open/recent
+3. Error output — if debugging, include the full error
+4. Project structure — `ls` or tree output of relevant directories
+5. Framework/language context — package.json, Cargo.toml, etc.
+
+**What NOT to include:**
+- Secrets, API keys, credentials, `.env` contents
+- Entire large files — extract the relevant section
+- Unrelated files that happen to be open
+
+The host-native advisor (Claude or Codex) already has project access, so context
+injection matters most for the external advisors. Build the advisor prompt once
+and send it to all three for consistency.
+
 ### Step 2: Query Advisors in Parallel
+
+**Prompt safety:** Never interpolate prompts directly into shell strings.
+Prompts contain quotes, backticks, dollar signs, and other shell-significant
+characters. Use heredocs or temp files:
+
+```bash
+# Safe: heredoc (preferred)
+gemini -p "$(cat <<'PROMPT'
+[advisor prompt with any characters safely]
+PROMPT
+)" --model gemini-3.1-pro-preview --sandbox -o json
+
+# Safe: temp file
+PROMPT_FILE=$(mktemp)
+cat <<'PROMPT' > "$PROMPT_FILE"
+[advisor prompt]
+PROMPT
+codex exec --sandbox read-only --skip-git-repo-check -- "$(cat "$PROMPT_FILE")"
+rm "$PROMPT_FILE"
+```
+
+The `<<'PROMPT'` (single-quoted delimiter) prevents shell expansion inside
+the heredoc. This is critical.
 
 **On Claude Code:** Run as a single background Task that queries all advisors and
 returns the complete synthesis.
@@ -71,10 +116,11 @@ Task:
     **User's question**: [prompt]
 
     **Instructions**:
-    1. Run these Bash commands in parallel for external advisors:
-       - gemini -p "[advisor prompt]" --model gemini-3.1-pro-preview --sandbox -o json
-       - Codex: prefer plugin companion if installed (see reference.md),
-         fall back to: codex exec --sandbox read-only --skip-git-repo-check -- "[advisor prompt]"
+    1. Run these Bash commands in parallel for external advisors
+       (use heredocs for prompt safety — never raw string interpolation):
+       - gemini -p "$(cat <<'PROMPT' ... PROMPT)" --model gemini-3.1-pro-preview --sandbox -o json
+       - codex exec --sandbox read-only --skip-git-repo-check -- "$(cat <<'PROMPT' ... PROMPT)"
+       (see reference.md for full CLI flags)
     2. Formulate your own response as the Claude advisor
     3. Wait for ALL results before proceeding
     4. If Gemini fails with 429/capacity: wait 60s, retry once, then skip
@@ -83,7 +129,7 @@ Task:
     6. Normalize each result and synthesize per the output format below
 
     **Advisor prompt format** — wrap the user's question with:
-    "[user's question]
+    "[user's question + gathered context from Step 1.5]
 
     In your response, explicitly state:
     - What assumptions you are making
@@ -97,14 +143,21 @@ Task:
     - Claude: (no additional framing — already has project context)
 ```
 
-**On Codex:** Use the current session as the local advisor. Launch external CLIs:
+**On Codex:** Use the current session as the local advisor. Launch external CLIs
+using heredocs for prompt safety:
 
 ```bash
 # Gemini (JSON for metrics — parse response field for content)
-gemini -p "[advisor prompt]" --model gemini-3.1-pro-preview --sandbox -o json
+gemini -p "$(cat <<'PROMPT'
+[advisor prompt]
+PROMPT
+)" --model gemini-3.1-pro-preview --sandbox -o json
 
 # Claude (JSON for reliable error detection)
-claude -p "[advisor prompt]" --output-format json
+claude -p "$(cat <<'PROMPT'
+[advisor prompt]
+PROMPT
+)" --output-format json
 ```
 
 For Claude JSON output, check `is_error` before normalizing — `true` means auth
@@ -187,14 +240,14 @@ advisor by its actual name (Claude or Codex).
 
 ### Step 5: Persist Session
 
-Write the full session to `~/.claude/magi/sessions/YYYY-MM-DD-<slug>.yaml`.
+Write a session record to `~/.claude/magi/sessions/YYYY-MM-DD-<slug>.yaml`.
 Create the directory if needed. The slug is the first ~50 chars of the question,
 lowercased, spaces to hyphens, non-alphanumeric removed.
 
-This runs unconditionally — every magi invocation produces a session file.
-Include the file path in the report so the user can find it.
+This runs unconditionally. Include the file path in the report so the user
+can find it.
 
-Session file shape:
+**Default** — summary record (compact, no full transcripts):
 
 ```yaml
 question: "original prompt"
@@ -212,14 +265,20 @@ advisors:
     information_gaps: [...]
     implications: [...]
     evidence_basis: [...]
-    content: "..."
-    critiques_received: [...]  # only present with --debate
-  # ... other advisors
+  # ... other advisors (summary-level only, no full content)
 synthesis:
   consensus: "..."
   conflicts: "..."
   recommendation: "..."
 ```
+
+**`--archive`** — includes full advisor content, critique round results,
+and raw provider metrics. Use when you want a complete audit trail.
+
+**Privacy:** Never persist secrets, API keys, or credentials. If the user's
+question or gathered context contains sensitive material, the orchestrator
+should redact before writing. When in doubt, omit the field rather than
+risk leaking secrets to disk.
 
 ## Failure Handling
 
@@ -259,6 +318,7 @@ When `$ARGUMENTS` is empty, show:
 Usage:
   /magi "prompt"                     # Counsel mode (default)
   /magi --debate "prompt"            # Add anonymized critique round
+  /magi --archive "prompt"           # Save full transcripts to session file
   /magi "Plan A vs Plan B"           # Plan synthesis mode
 
 Examples:
