@@ -90,21 +90,23 @@ gemini -p "$(cat <<'PROMPT'
 PROMPT
 )" --model gemini-3.1-pro-preview --sandbox -o json
 
-# Safe: temp file
+# Safe: temp file + adapter
 PROMPT_FILE=$(mktemp)
 cat <<'PROMPT' > "$PROMPT_FILE"
 [advisor prompt]
 PROMPT
-codex exec --sandbox read-only --skip-git-repo-check -- "$(cat "$PROMPT_FILE")" < /dev/null
+bash "$(dirname "$0")/codex-adapter.sh" "$(cat "$PROMPT_FILE")"
 rm "$PROMPT_FILE"
 ```
 
 The `<<'PROMPT'` (single-quoted delimiter) prevents shell expansion inside
 the heredoc. This is critical.
 
-**Stdin:** Always redirect `< /dev/null` for `codex exec`. Inside subagents,
-stdin is an open pipe that never sends EOF, causing codex to hang forever
-waiting for additional input — even when a prompt argument is provided.
+**Codex transport:** Always use [codex-adapter.sh](codex-adapter.sh) instead
+of calling `codex exec` directly. The adapter prefers the companion plugin
+(HTTP transport, no stdin issues) and falls back to `codex exec < /dev/null`
+with a timeout. This prevents hangs in subagent environments where stdin is
+an open pipe that never sends EOF.
 
 **On Claude Code:** Run as a single background Task that queries all advisors and
 returns the complete synthesis.
@@ -123,8 +125,8 @@ Task:
     1. Run these Bash commands in parallel for external advisors
        (use heredocs for prompt safety — never raw string interpolation):
        - gemini -p "$(cat <<'PROMPT' ... PROMPT)" --model gemini-3.1-pro-preview --sandbox -o json
-       - codex exec --sandbox read-only --skip-git-repo-check -- "$(cat <<'PROMPT' ... PROMPT)" < /dev/null
-       (see reference.md for full CLI flags)
+       - bash codex-adapter.sh "$(cat <<'PROMPT' ... PROMPT)"
+       (see reference.md for full CLI flags and codex-adapter.sh for transport details)
     2. Formulate your own response as the Claude advisor
     3. Wait for ALL results before proceeding
     4. If Gemini fails with 429/capacity: wait 60s, retry once, then skip

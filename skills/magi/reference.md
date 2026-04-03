@@ -39,20 +39,20 @@ Get a key from https://aistudio.google.com/app/apikey
 
 **Capacity errors:** On 429: wait 60s → retry once → skip.
 
-### Codex CLI
+### Codex (via adapter)
+
+Always invoke Codex through [codex-adapter.sh](codex-adapter.sh):
 
 ```bash
-codex exec --sandbox read-only --skip-git-repo-check -- "$(cat <<'PROMPT'
+bash codex-adapter.sh "$(cat <<'PROMPT'
 [advisor prompt]
 PROMPT
-)" < /dev/null
+)"
 ```
 
-| Flag | Purpose |
-|------|---------|
-| `exec` | Non-interactive mode |
-| `--sandbox` | `read-only`, `workspace-write`, `danger-full-access` |
-| `--skip-git-repo-check` | Run outside git repos |
+The adapter prefers the companion plugin (HTTP transport to Codex app-server)
+and falls back to `codex exec < /dev/null` with a 300s timeout. Never call
+`codex exec` directly — it hangs in subagent environments.
 
 **Metrics:** Aggregate token count only (single number, no in/out split). No
 timing from CLI — measure wall time externally.
