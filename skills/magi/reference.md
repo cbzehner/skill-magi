@@ -51,7 +51,7 @@ PROMPT
 ```
 
 The adapter prefers the companion plugin (HTTP transport to Codex app-server)
-and falls back to `codex exec < /dev/null` with a 300s timeout. Never call
+and falls back to `codex exec < /dev/null` with a 900s timeout. Never call
 `codex exec` directly — it hangs in subagent environments.
 
 **Metrics:** Aggregate token count only (single number, no in/out split). No

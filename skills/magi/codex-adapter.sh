@@ -23,8 +23,8 @@ find_companion() {
 
 if COMPANION="$(find_companion)"; then
   >&2 echo "[codex-adapter] transport: companion plugin"
-  timeout 300 node "$COMPANION" task "$PROMPT" < /dev/null
+  timeout 900 node "$COMPANION" task "$PROMPT" < /dev/null
 else
   >&2 echo "[codex-adapter] transport: codex exec CLI"
-  timeout 300 codex exec --sandbox read-only --skip-git-repo-check -- "$PROMPT" < /dev/null
+  timeout 900 codex exec --sandbox read-only --skip-git-repo-check -- "$PROMPT" < /dev/null
 fi
