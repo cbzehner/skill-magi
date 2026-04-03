@@ -262,6 +262,10 @@ code-generated, and the only LLM-generated part is unstructured.
 # Magi Session: YYYY-MM-DD
 **Question**: [original prompt verbatim]
 **Advisors**: claude (ok), gemini (ok), codex (failed)
+**Decision**: [optional — the concrete choice made, if one emerged from synthesis]
+**Predictions**: [optional — what we expect to happen as a result]
+**Confidence**: [optional — high | medium | low]
+**Tags**: [optional — scope tags for filtering: backend, architecture, testing, tooling, etc.]
 
 ## Synthesis
 [LLM-generated narrative: what advisors agreed on, where they disagreed,
@@ -278,9 +282,12 @@ information gaps, and evidence basis — as flowing prose, not structured fields
 [same, or a brief failure note if the advisor failed]
 ```
 
-**Header rules**: The `# Magi Session` line, `**Question**`, and `**Advisors**`
-lines are filled in by the orchestrator from known values. Do not embellish or
-add extra metadata fields. Token counts, wall times, model versions, and debug
+**Header rules**: The `# Magi Session` line, `**Question**`, `**Advisors**`,
+and optional `**Decision**`/`**Predictions**`/`**Confidence**`/`**Tags**` lines
+are filled in by the orchestrator from known values. The optional fields are
+written only when synthesis produced a clear decision — omit them for
+exploratory sessions with no actionable conclusion. Do not embellish or add
+extra metadata fields. Token counts, wall times, model versions, and debug
 info are noise for the primary consumer (an LLM reading this back via seance).
 
 **Section headers**: Always use `## Synthesis`, `## Claude`, `## Gemini`,
